@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON ARCADE</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #00f5ff;
+    --green: #39ff14;
+    --magenta: #ff00ff;
+    --blue: #0066ff;
+    --yellow: #ffff00;
+    --orange: #ff6600;
+    --bg: #020b18;
+    --card-bg: #040f1e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Share Tech Mono', monospace;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  #cursor {
+    width: 18px; height: 18px;
+    border: 2px solid var(--cyan);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s, border-color 0.2s, width 0.2s, height 0.2s;
+    mix-blend-mode: screen;
+  }
+  #cursor.hovered {
+    width: 36px; height: 36px;
+    border-color: var(--magenta);
+    background: rgba(255,0,255,0.08);
+  }
+
+  /* Stars background */
+  #stars-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* Scanlines overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 60px 20px 30px;
+  }
+
+  .header-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 8px;
+    color: rgba(0,245,255,0.5);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    animation: fadeSlideDown 0.8s ease both;
+  }
+
+  .main-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(42px, 8vw, 96px);
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: #fff;
+    text-shadow:
+      0 0 10px var(--cyan),
+      0 0 30px var(--cyan),
+      0 0 60px rgba(0,245,255,0.4);
+    animation: fadeSlideDown 0.8s ease 0.1s both, titlePulse 3s ease-in-out 1s infinite;
+    position: relative;
+    display: inline-block;
+  }
+
+  .main-title::before {
+    content: 'NEON ARCADE';
+    position: absolute;
+    top: 0; left: 0;
+    color: var(--magenta);
+    text-shadow: 0 0 20px var(--magenta);
+    clip-path: polygon(0 35%, 100% 35%, 100% 45%, 0 45%);
+    animation: glitch1 4s infinite;
+    opacity: 0.7;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    letter-spacing: 6px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 12px;
+    animation: fadeSlideDown 0.8s ease 0.3s both;
+  }
+
+  .coin-indicator {
+    margin-top: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--yellow);
+    letter-spacing: 3px;
+    animation: blink 1s step-end infinite, fadeSlideDown 0.8s ease 0.5s both;
+  }
+
+  .coin-indicator::before {
+    content: '●';
+    color: var(--yellow);
+    text-shadow: 0 0 12px var(--yellow);
+  }
+
+  /* Grid */
+  .arcade-grid {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 28px;
+    max-width: 1400px;
+    margin: 40px auto 80px;
+    padding: 0 32px;
+  }
+
+  /* Card */
+  .game-card {
+    position: relative;
+    background: var(--card-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: none;
+    text-decoration: none;
+    display: block;
+    animation: cardIn 0.6s ease both;
+    transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .game-card:nth-child(1) { animation-delay: 0.1s; --accent: var(--cyan); }
+  .game-card:nth-child(2) { animation-delay: 0.2s; --accent: var(--green); }
+  .game-card:nth-child(3) { animation-delay: 0.3s; --accent: var(--blue); }
+  .game-card:nth-child(4) { animation-delay: 0.4s; --accent: var(--magenta); }
+  .game-card:nth-child(5) { animation-delay: 0.5s; --accent: var(--orange); }
+  .game-card:nth-child(6) { animation-delay: 0.6s; --accent: var(--yellow); }
+  .game-card:nth-child(7) { animation-delay: 0.7s; --accent: #a855f7; }
+  .game-card:nth-child(8) { animation-delay: 0.8s; --accent: #ff4466; }
+
+  .game-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    padding: 2px;
+    background: linear-gradient(135deg, var(--accent), transparent 60%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.8;
+    transition: opacity 0.3s;
+  }
+
+  .game-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .game-card:hover {
+    transform: translateY(-8px) scale(1.02);
+  }
+
+  .game-card:hover::before {
+    opacity: 1;
+    background: linear-gradient(135deg, var(--accent), rgba(255,255,255,0.1) 100%);
+  }
+
+  /* Glow border on hover */
+  .card-glow {
+    position: absolute;
+    inset: -1px;
+    border-radius: 13px;
+    border: 1px solid var(--accent);
+    opacity: 0;
+    box-shadow:
+      0 0 15px var(--accent),
+      0 0 40px var(--accent),
+      inset 0 0 20px rgba(0,0,0,0.5);
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  .game-card:hover .card-glow { opacity: 1; }
+
+  /* Preview area */
+  .card-preview {
+    height: 200px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.2) 100%);
+  }
+
+  .card-preview-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(var(--r),var(--g),var(--b),0.15) 0%, transparent 70%);
+  }
+
+  /* Game icons (canvas-drawn) */
+  .card-preview canvas {
+    position: relative;
+    z-index: 2;
+    filter: drop-shadow(0 0 8px var(--accent));
+  }
+
+  /* Play button overlay */
+  .play-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 5;
+  }
+
+  .game-card:hover .play-overlay { opacity: 1; }
+
+  .play-btn {
+    width: 64px; height: 64px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent);
+    animation: pulseRing 1.5s ease-in-out infinite;
+  }
+
+  .play-btn svg {
+    width: 24px; height: 24px;
+    fill: var(--accent);
+    margin-left: 4px;
+  }
+
+  /* Card info */
+  .card-info {
+    padding: 20px 22px 22px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .card-number {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    opacity: 0.6;
+    margin-bottom: 6px;
+  }
+
+  .card-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-shadow: 0 0 12px var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .card-genre {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: blink 2s ease-in-out infinite;
+    display: inline-block;
+    margin-right: 8px;
+  }
+
+  .status-text {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.3);
+  }
+
+  .play-tag {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 10px;
+    border-radius: 2px;
+    opacity: 0.7;
+    transition: opacity 0.3s, box-shadow 0.3s;
+  }
+
+  .game-card:hover .play-tag {
+    opacity: 1;
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  /* Corner decorations */
+  .corner {
+    position: absolute;
+    width: 14px; height: 14px;
+    z-index: 6;
+  }
+  .corner-tl { top: 8px; left: 8px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); }
+  .corner-tr { top: 8px; right: 8px; border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+  .corner-bl { bottom: 8px; left: 8px; border-bottom: 2px solid var(--accent); border-left: 2px solid var(--accent); }
+  .corner-br { bottom: 8px; right: 8px; border-bottom: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+
+  /* Footer */
+  footer {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 30px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  footer p {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.2);
+  }
+
+  /* Animations */
+  @keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(40px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes titlePulse {
+    0%, 100% { text-shadow: 0 0 10px var(--cyan), 0 0 30px var(--cyan), 0 0 60px rgba(0,245,255,0.4); }
+    50% { text-shadow: 0 0 20px var(--cyan), 0 0 50px var(--cyan), 0 0 100px rgba(0,245,255,0.7); }
+  }
+
+  @keyframes glitch1 {
+    0%, 90%, 100% { clip-path: polygon(0 35%, 100% 35%, 100% 45%, 0 45%); transform: translate(0); }
+    92% { clip-path: polygon(0 20%, 100% 20%, 100% 30%, 0 30%); transform: translate(-4px, 0); }
+    94% { clip-path: polygon(0 60%, 100% 60%, 100% 70%, 0 70%); transform: translate(4px, 0); }
+    96% { clip-path: polygon(0 10%, 100% 10%, 100% 15%, 0 15%); transform: translate(-2px, 0); }
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  @keyframes pulseRing {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+<div id="cursor"></div>
+
+<header>
+  <div class="header-label">★ Welcome to ★</div>
+  <h1 class="main-title">NEON ARCADE</h1>
+  <p class="subtitle">8 · G A M E · A I · A R C A D E · C O L L E C T I O N</p>
+  <div class="coin-indicator">INSERT COIN TO PLAY</div>
+</header>
+
+<div class="arcade-grid" id="grid"></div>
+
+<footer>
+  <p>© NEON ARCADE — ALL SYSTEMS ONLINE — 8 GAMES LOADED</p>
+</footer>
+
+<script>
+const games = [
+  {
+    title: 'NEON VOID',
+    genre: 'Space Shooter',
+    url: 'https://ak3036811-gif.github.io/NEON-VOID/',
+    accent: '#00f5ff',
+    rgb: '0,245,255',
+    icon: 'spaceship'
+  },
+  {
+    title: 'TERRA RUN',
+    genre: 'Endless Runner',
+    url: 'https://ak3036811-gif.github.io/TERRA-RUN-Endless-Runner-/',
+    accent: '#39ff14',
+    rgb: '57,255,20',
+    icon: 'runner'
+  },
+  {
+    title: 'AQUA DEPTH',
+    genre: 'Submarine',
+    url: 'https://ak3036811-gif.github.io/AQUA-DEPTH/',
+    accent: '#0088ff',
+    rgb: '0,136,255',
+    icon: 'submarine'
+  },
+  {
+    title: 'BLOCK NOVA',
+    genre: 'Brick Breaker',
+    url: 'https://ak3036811-gif.github.io/BLOCK-NOVA/',
+    accent: '#ff00ff',
+    rgb: '255,0,255',
+    icon: 'bricks'
+  },
+  {
+    title: 'NEBULA DASH',
+    genre: 'Arcade',
+    url: 'https://ak3036811-gif.github.io/nebula-dash/',
+    accent: '#ff6600',
+    rgb: '255,102,0',
+    icon: 'nebula'
+  },
+  {
+    title: 'WORD GAME',
+    genre: 'Puzzle',
+    url: 'https://ak3036811-gif.github.io/Word-game/',
+    accent: '#ffff00',
+    rgb: '255,255,0',
+    icon: 'word'
+  },
+  {
+    title: 'GET THE BOX',
+    genre: 'Puzzle',
+    url: 'https://ak3036811-gif.github.io/Get-the-box/',
+    accent: '#a855f7',
+    rgb: '168,85,247',
+    icon: 'box'
+  },
+  {
+    title: 'SIGNAL VOID',
+    genre: 'Action',
+    url: 'https://ak3036811-gif.github.io/Signal-Void/',
+    accent: '#ff4466',
+    rgb: '255,68,102',
+    icon: 'signal'
+  }
+];
+
+function drawIcon(canvas, type, color) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+
+  const cx = w / 2, cy = h / 2;
+
+  if (type === 'spaceship') {
+    // Ship triangle
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 30);
+    ctx.lineTo(cx - 22, cy + 20);
+    ctx.lineTo(cx + 22, cy + 20);
+    ctx.closePath();
+    ctx.stroke();
+    // Wings
+    ctx.beginPath(); ctx.moveTo(cx - 22, cy + 20); ctx.lineTo(cx - 38, cy + 30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 22, cy + 20); ctx.lineTo(cx + 38, cy + 30); ctx.stroke();
+    // Eyes
+    ctx.beginPath(); ctx.arc(cx - 8, cy - 8, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 8, cy - 8, 3, 0, Math.PI*2); ctx.fill();
+    // Exhaust particles
+    for (let i = 0; i < 5; i++) {
+      ctx.globalAlpha = Math.random() * 0.6 + 0.2;
+      ctx.beginPath(); ctx.arc(cx + (Math.random()-0.5)*20, cy + 28 + Math.random()*20, 2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (type === 'runner') {
+    // Stick figure running
+    ctx.beginPath(); ctx.arc(cx + 10, cy - 22, 9, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 10, cy - 13); ctx.lineTo(cx + 10, cy + 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 10, cy + 8); ctx.lineTo(cx - 5, cy + 22); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 10, cy + 8); ctx.lineTo(cx + 25, cy + 18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 10, cy - 4); ctx.lineTo(cx - 5, cy + 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 10, cy - 4); ctx.lineTo(cx + 24, cy); ctx.stroke();
+    // Ground
+    ctx.beginPath(); ctx.moveTo(cx - 35, cy + 30); ctx.lineTo(cx + 35, cy + 30); ctx.stroke();
+    // Obstacle
+    ctx.fillRect(cx + 28, cy + 16, 12, 14);
+  } else if (type === 'submarine') {
+    // Sub body
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 8, 38, 16, 0, 0, Math.PI*2);
+    ctx.stroke();
+    // Tower
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(cx - 8, cy - 14, 16, 22, 3) : ctx.rect(cx - 8, cy - 14, 16, 22);
+    ctx.stroke();
+    // Periscope
+    ctx.beginPath(); ctx.moveTo(cx, cy - 14); ctx.lineTo(cx, cy - 28); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy - 28, 3, 0, Math.PI*2); ctx.stroke();
+    // Propeller
+    ctx.beginPath(); ctx.moveTo(cx + 38, cy + 2); ctx.lineTo(cx + 50, cy - 10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 38, cy + 14); ctx.lineTo(cx + 50, cy + 26); ctx.stroke();
+    // Bubbles
+    for (let i = 0; i < 5; i++) {
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath(); ctx.arc(cx - 10 + i*6, cy - 26 - i*4, 2, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  } else if (type === 'bricks') {
+    // Brick grid
+    const cols = 5, rows = 2, bw = 18, bh = 10, gap = 4;
+    const startX = cx - (cols*(bw+gap))/2 + gap/2;
+    const startY = cy - 28;
+    const colors2 = [color, '#ff66ff', '#ffaaff'];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillStyle = colors2[(r+c)%2];
+        ctx.shadowColor = colors2[(r+c)%2];
+        ctx.fillRect(startX + c*(bw+gap), startY + r*(bh+gap), bw, bh);
+      }
+    }
+    // Ball
+    ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 16, cy + 14, 5, 0, Math.PI*2); ctx.fill();
+    // Paddle
+    ctx.fillStyle = color; ctx.shadowColor = color;
+    ctx.fillRect(cx - 22, cy + 30, 44, 7);
+  } else if (type === 'nebula') {
+    // Star/nebula burst
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const r1 = 28, r2 = 14;
+      const x1 = cx + Math.cos(angle) * r1, y1 = cy + Math.sin(angle) * r1;
+      const x2 = cx + Math.cos(angle + Math.PI/8) * r2, y2 = cy + Math.sin(angle + Math.PI/8) * r2;
+      if (i === 0) { ctx.beginPath(); ctx.moveTo(x1, y1); }
+      else { ctx.lineTo(x2, y2); ctx.lineTo(x1, y1); }
+    }
+    ctx.closePath(); ctx.stroke();
+    // Center
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI*2); ctx.fill();
+    // Particles
+    for (let i = 0; i < 12; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 32 + Math.random() * 18;
+      ctx.globalAlpha = Math.random() * 0.7 + 0.2;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(angle)*dist, cy + Math.sin(angle)*dist, 1.5, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (type === 'word') {
+    // Letter tiles
+    const letters = ['W','O','R','D'];
+    ctx.font = 'bold 18px Orbitron, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    letters.forEach((l, i) => {
+      ctx.strokeRect(cx - 42 + i*28, cy - 16, 24, 24);
+      ctx.fillText(l, cx - 30 + i*28, cy - 4);
+    });
+    // Underline
+    ctx.beginPath(); ctx.moveTo(cx - 46, cy + 16); ctx.lineTo(cx + 46, cy + 16); ctx.stroke();
+    // Score
+    ctx.font = '10px Share Tech Mono';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText('+100 PTS', cx, cy + 32);
+  } else if (type === 'box') {
+    // 3D box isometric
+    // Top face
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 28);
+    ctx.lineTo(cx + 24, cy - 14);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx - 24, cy - 14);
+    ctx.closePath(); ctx.stroke();
+    // Left face
+    ctx.beginPath();
+    ctx.moveTo(cx - 24, cy - 14);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx, cy + 24);
+    ctx.lineTo(cx - 24, cy + 10);
+    ctx.closePath(); ctx.stroke();
+    // Right face
+    ctx.beginPath();
+    ctx.moveTo(cx + 24, cy - 14);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx, cy + 24);
+    ctx.lineTo(cx + 24, cy + 10);
+    ctx.closePath(); ctx.stroke();
+    // Target arrow
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.moveTo(cx - 42, cy - 14); ctx.lineTo(cx - 30, cy - 14);
+    ctx.moveTo(cx - 36, cy - 20); ctx.lineTo(cx - 30, cy - 14); ctx.lineTo(cx - 36, cy - 8);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  } else if (type === 'signal') {
+    // Signal waves
+    for (let i = 3; i >= 0; i--) {
+      ctx.globalAlpha = (4 - i) / 4 * 0.9;
+      ctx.beginPath();
+      ctx.arc(cx, cy + 10, 8 + i * 14, -Math.PI * 0.75, -Math.PI * 0.25);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // Antenna
+    ctx.beginPath(); ctx.moveTo(cx, cy + 10); ctx.lineTo(cx, cy - 30); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy - 30, 4, 0, Math.PI*2); ctx.fill();
+    // Base
+    ctx.fillRect(cx - 12, cy + 10, 24, 6);
+    ctx.fillRect(cx - 20, cy + 16, 40, 5);
+  }
+}
+
+function buildCards() {
+  const grid = document.getElementById('grid');
+  games.forEach((game, i) => {
+    const a = document.createElement('a');
+    a.href = game.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'game-card';
+    a.style.setProperty('--accent', game.accent);
+    a.innerHTML = `
+      <div class="card-glow"></div>
+      <div class="corner corner-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner corner-br"></div>
+      <div class="card-preview">
+        <div class="card-preview-bg" style="--r:${game.rgb.split(',')[0]};--g:${game.rgb.split(',')[1]};--b:${game.rgb.split(',')[2]}"></div>
+        <canvas width="140" height="100" id="icon-${i}"></canvas>
+        <div class="play-overlay">
+          <div class="play-btn">
+            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="card-info">
+        <div class="card-number">GAME // ${String(i+1).padStart(2,'0')}</div>
+        <div class="card-title">${game.title}</div>
+        <div class="card-genre">${game.genre}</div>
+        <div class="card-footer">
+          <span><span class="status-dot"></span><span class="status-text">ONLINE</span></span>
+          <span class="play-tag">PLAY NOW ›</span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(a);
+    setTimeout(() => {
+      const canvas = document.getElementById(`icon-${i}`);
+      if (canvas) drawIcon(canvas, game.icon, game.accent);
+    }, 100);
+  });
+}
+
+// Stars
+function initStars() {
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (let i = 0; i < 200; i++) {
+    stars.push({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      r: Math.random() * 1.5 + 0.3,
+      speed: Math.random() * 0.3 + 0.05,
+      twinkle: Math.random() * Math.PI * 2
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    stars.forEach(s => {
+      s.twinkle += 0.02;
+      const alpha = 0.3 + Math.sin(s.twinkle) * 0.25;
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+      s.y += s.speed;
+      if (s.y > canvas.height) { s.y = 0; s.x = Math.random() * canvas.width; }
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+// Custom cursor
+function initCursor() {
+  const cursor = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top = e.clientY + 'px';
+  });
+  document.querySelectorAll('.game-card').forEach(el => {
+    el.addEventListener('mouseenter', () => cursor.classList.add('hovered'));
+    el.addEventListener('mouseleave', () => cursor.classList.remove('hovered'));
+  });
+}
+
+// Animated icon loop
+function animateIcons() {
+  let t = 0;
+  function frame() {
+    t += 0.03;
+    games.forEach((game, i) => {
+      const canvas = document.getElementById(`icon-${i}`);
+      if (!canvas) return;
+      drawIcon(canvas, game.icon, game.accent);
+      // Subtle float effect via transform
+    });
+    requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+buildCards();
+initStars();
+setTimeout(() => {
+  initCursor();
+  animateIcons();
+}, 200);
+
+// Hover particle burst
+document.addEventListener('DOMContentLoaded', () => {});
+</script>
+</body>
+</html>
